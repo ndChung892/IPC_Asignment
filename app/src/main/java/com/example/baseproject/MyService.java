@@ -17,7 +17,7 @@ public class MyService extends Service {
     HandlerThread handlerThreadCreate, handlerThreadBlocking, handlerThreadNonBlock;
     Handler handlerNonBlock, handlerBlocking, handler;
     private static final String TAG = "MyService";
-    Queue<Integer> intQueue = new ArrayDeque<>();
+    Queue<Integer> intQueue = new ArrayDeque<Integer>();
     private int intProduct = 0;
 
     @Override
@@ -35,6 +35,7 @@ public class MyService extends Service {
     private final IAIDLInterface.Stub bindServices = new IAIDLInterface.Stub() {
         @Override
         public void createProduct() throws RemoteException {
+            intProduct = 0;
             handlerThreadCreate= new HandlerThread("Server");
             handlerThreadCreate.start();
             handler= new Handler(handlerThreadCreate.getLooper());
@@ -42,21 +43,24 @@ public class MyService extends Service {
                 @Override
                 public void run() {
                     while (true) {
-                        if (intQueue.size() == 5) {
+                        synchronized (this){
+                            while(intQueue.size() == 5) {
+                                try {
+                                    wait();
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                            intProduct = intProduct + 1;
+                            intQueue.add(intProduct);
+                            notify();
                             try {
-                                wait();
+                                Thread.sleep(1000);
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
                         }
-                        intProduct = intProduct++;
-                        intQueue.add(intProduct);
-                        notify();
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
-                        }
+
 
                     }
                 }
@@ -72,24 +76,25 @@ public class MyService extends Service {
                 @Override
                 public void run() {
                     while (true) {
-                        if (intQueue == null) {
+                        synchronized (this){
+                            while (intQueue.isEmpty()) {
+                                try {
+                                    wait();
+                                } catch (InterruptedException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+                            int value = intQueue.remove();
                             try {
-                                wait();
+                                blockConsumer.responseInt(value);
+                            } catch (RemoteException e) {
+                                e.printStackTrace();
+                            }notify();
+                            try {
+                                Thread.sleep(1000);
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
-                        }
-                        int value = intQueue.remove();
-                        try {
-                            blockConsumer.responseInt(value);
-                            notify();
-                        } catch (RemoteException e) {
-                            e.printStackTrace();
-                        }
-                        try {
-                            Thread.sleep(1000);
-                        } catch (InterruptedException e) {
-                            e.printStackTrace();
                         }
                     }
                 }
@@ -115,14 +120,12 @@ public class MyService extends Service {
                                     e.printStackTrace();
                                 }
                             int value = intQueue.remove();
-                            Log.i("CONSUMER", "" + value);
                             try {
                                 nonBlockConsumer.responseInt(value);
-                                notify();
+
                             } catch (RemoteException e) {
                                 e.printStackTrace();
-                            }
-
+                            }notify();
                             try {
                                 Thread.sleep(1000);
                             } catch (InterruptedException e) {
