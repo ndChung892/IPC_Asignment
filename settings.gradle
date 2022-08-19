@@ -14,3 +14,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Base Project"
 include ':app'
+include ':firstclient'
+include ':secondclient'
